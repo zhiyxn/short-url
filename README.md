@@ -50,27 +50,32 @@ npm run dev
 
 1. 将代码推送到 GitHub/GitLab
 2. 在 Cloudflare Dashboard 中创建 Pages 项目
-3. 连接你的 Git 仓库
-4. 设置构建配置：
-   - 构建命令：留空
+3. 选择 "连接 Git"
+4. 授权并选择此仓库
+5. **构建设置（重要）**：
+   - 框架：`无`
+   - 构建命令：（留空）
    - 构建输出目录：`public`
-5. 在 Pages 项目设置中添加 KV 绑定：
+6. 部署后，在 Pages 项目设置中添加 KV 绑定：
+   - 进入 → 设置 → Functions → KV namespace bindings
    - 变量名：`URL_STORE`
    - KV 命名空间：选择之前创建的命名空间
+7. 重新部署（触发新构建）
 
-**方法 B：通过命令行部署**
+> **注意**：如果部署后看到 "Hello world"，说明构建输出目录设置错误，改为 `public` 并重新部署
 
-```bash
-# 首次部署
-npm run deploy
+**方法 B：GitHub Actions 自动部署（可选）**
 
-# 然后在 Cloudflare Dashboard 中为 Pages 项目添加 KV 绑定
-```
+项目已包含 `.github/workflows/deploy.yml`，支持自动部署。需要设置：
 
-在 Cloudflare Dashboard 中：
-1. 进入 Pages 项目
-2. 设置 → Functions → KV namespace bindings
-3. 添加绑定：变量名 `URL_STORE`，选择你的 KV 命名空间
+1. GitHub 仓库 → Settings → Secrets
+2. 添加环境变量：
+   - `CLOUDFLARE_API_TOKEN`: Cloudflare API Token
+   - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare Account ID
+
+获取方法：
+- Account ID：Cloudflare Dashboard → 账户 → API 令牌 → 帐户 ID
+- API Token：创建 Token → Pages 权限 → 获取 Token
 
 ### 方式二：Cloudflare Workers
 
