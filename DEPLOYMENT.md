@@ -1,164 +1,224 @@
-# Cloudflare Pages 部署指南
+# Cloudflare Workers 部署指南
+
+基于 Cloudflare Workers 的短链接服务 API。
 
 ## 前置条件
 
 - 已有 Cloudflare 账户
 - 已安装 Node.js 和 npm
-- 已安装 Wrangler CLI: `npm install -g @cloudflare/wrangler`
+- 已安装 Wrangler CLI
+
+```bash
+npm install -g @cloudflare/wrangler
+# 或
+npm install -D wrangler
+```
 
 ## 部署步骤
 
-### 1. 创建 KV Namespace
-
-在 Cloudflare Dashboard 中：
-1. 进入 Workers 和 Pages → KV
-2. 创建命名空间 `url_store`（生产环境）
-3. 可选：创建 `url_store_preview`（预览环境）
-4. 记录下命名空间 ID
-
-### 2. 更新配置文件
-
-编辑 `wrangler.toml`，填入：
-
-```toml
-account_id = "your_account_id"  # 从 CF Dashboard 获取
-
-[[kv_namespaces]]
-binding = "URL_STORE"
-id = "your_kv_namespace_id"           # 生产环境 ID
-preview_id = "your_preview_namespace_id"  # 预览环境 ID（可选）
-```
-
-### 3. 关联 Git 仓库（推荐方法）
-
-1. 将代码推送到 GitHub/GitLab
-2. 在 Cloudflare Dashboard 创建新的 Pages 项目
-3. 选择 "连接 Git"
-4. 授权并选择此仓库
-5. **构建设置**（重要，三个字段都要对）：
-   - Framework preset: `None`（选"无"）
-   - Build command: 留空（不要填任何东西）
-   - Build output directory: `public`（不是 `/public` 或 `./public`）
-6. **环境变量配置**（在 Pages 项目设置中）：
-   - 进入项目 → 设置 → 函数
-   - 添加 KV 命名空间绑定：
-     - 变量名：`URL_STORE`
-     - KV 命名空间：选择上面创建的命名空间
-
-### 4. 本地部署（可选）
-
-如需本地测试或直接部署：
+### 1. 创建 KV 命名空间
 
 ```bash
-# 测试本地环境
-wrangler pages dev public --compatibility-date=2024-01-01
+# 创建生产环境命名空间
+wrangler kv:namespace create "URL_STORE"
 
-# 部署到 Pages
-wrangler pages deploy public
+# 输出示例：
+# 🌀 Creating KV namespace "URL_STORE"
+# ✨ Created KV namespace "URL_STORE"
+# Add the following to your wrangler.toml:
+# id = "abcd1234..."
+# preview_id = "efgh5678..."
 ```
+
+记录返回的 `id` 和 `preview_id`。
+
+### 2. 配置 wrangler.toml
+
+编辑 `wrangler.toml`，填入刚创建的命名空间 ID：
+
+```toml
+[[kv_namespaces]]
+binding = "URL_STORE"
+id = "your_kv_namespace_id"           # 粘贴生产环境 ID
+preview_id = "your_preview_kv_namespace_id"  # 粘贴预览环境 ID
+```
+
+### 3. 本地开发和测试
+
+```bash
+# 启动本地开发服务器
+npm run dev
+
+# 访问 http://localhost:8787
+```
+
+### 4. 部署到 Cloudflare Workers
+
+```bash
+npm run deploy
+
+# 输出示例：
+# 🌍 Uploading...
+# ✨ Success! Worker uploaded to https://short-url.your-account.workers.dev
+```
+
+---
+
+## API 接口
+
+### 创建短链接
+
+```bash
+curl -X POST https://your-worker.workers.dev/api/shorten \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/very/long/url",
+    "customCode": "mycode"
+  }'
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "shortCode": "mycode",
+  "shortUrl": "https://your-worker.workers.dev/mycode",
+  "originalUrl": "https://example.com/very/long/url"
+}
+```
+
+### 获取短链接信息
+
+```bash
+curl https://your-worker.workers.dev/api/info/mycode
+```
+
+**响应**：
+```json
+{
+  "url": "https://example.com/very/long/url",
+  "shortCode": "mycode",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "clicks": 42
+}
+```
+
+### 重定向
+
+访问短链接直接跳转：
+```
+https://your-worker.workers.dev/mycode → 重定向到原始 URL
+```
+
+### 删除短链接
+
+```bash
+curl -X DELETE https://your-worker.workers.dev/api/mycode
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "message": "短链接已删除"
+}
+```
+
+---
 
 ## 项目结构
 
 ```
 short-url/
-├── functions/          # Cloudflare Pages 函数路由
-│   ├── [[path]].js    # 通配符路由（处理短链接重定向）
-│   ├── api/
-│   │   ├── shorten.js     # POST /api/shorten - 创建短链接
-│   │   ├── [code].js      # GET/DELETE /api/{code} - 获取/删除
-│   │   └── info/
-│   │       └── [code].js  # GET /api/info/{code} - 获取信息（备选）
-│   └── utils.js        # 共享工具函数
-├── public/
-│   └── index.html      # 主页面
-├── wrangler.toml       # Wrangler 配置
-└── package.json        # 项目配置
+├── src/
+│   └── index.js              # Worker 主文件
+├── wrangler.toml             # Cloudflare 配置
+├── package.json              # 项目配置
+├── README.md                 # 项目文档
+└── DEPLOYMENT.md             # 部署指南（本文件）
 ```
 
-## 路由映射
+## 配置说明
 
-| 方法 | 路径 | 功能 |
-|------|------|------|
-| POST | `/api/shorten` | 创建短链接 |
-| GET | `/api/{code}` | 获取短链接信息 |
-| DELETE | `/api/{code}` | 删除短链接 |
-| GET | `/{code}` | 重定向到原始 URL |
-| GET | `/` | 显示 API 文档 |
+### wrangler.toml
 
-## 注意事项
+| 字段 | 说明 |
+|------|------|
+| `name` | Worker 名称 |
+| `main` | 入口文件路径 |
+| `compatibility_date` | 兼容性日期 |
+| `kv_namespaces` | KV 存储绑定 |
 
-### 路由优先级
+### 环境变量
 
-Cloudflare Pages 的路由优先级（从高到低）：
-1. 具体路径：`/api/shorten`
-2. 参数化路由：`/api/[code]`、`/api/info/[code]`
-3. 通配符路由：`/[[path]]`
+如需添加环境变量（如自定义域名），在 wrangler.toml 中添加：
 
-当前配置中：
-- `/api/shorten` - 由 `functions/api/shorten.js` 处理
-- `/api/{code}` - 由 `functions/api/[code].js` 处理（GET/DELETE）
-- `/{code}` - 由 `functions/[[path]].js` 处理（重定向）
+```toml
+[env.production]
+vars = { DOMAIN = "yourdomain.com" }
+```
 
-### 删除重复的处理器
+在代码中使用：
+```javascript
+const domain = env.DOMAIN || 'your-worker.workers.dev';
+```
 
-`functions/api/info/[code].js` 现已被 `functions/api/[code].js` 的 `onRequestGet` 函数替代。可选择保留或删除。
+---
 
-### 自定义域名
+## 常见问题
 
-部署后，在 Cloudflare Pages 项目设置中：
-1. 进入 "自定义域名"
-2. 添加你的域名或使用 Pages 默认域名
-3. 配置 DNS 记录
-
-## 测试 API
-
-部署完成后，测试各个端点：
+### Q: 如何更新部署？
 
 ```bash
-# 创建短链接
-curl -X POST https://your-domain.com/api/shorten \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com"}'
-
-# 获取短链接信息
-curl https://your-domain.com/api/abc123
-
-# 删除短链接
-curl -X DELETE https://your-domain.com/api/abc123
-
-# 访问短链接（重定向）
-curl -L https://your-domain.com/abc123
+# 修改代码后
+npm run deploy
 ```
+
+### Q: 如何查看部署的 Worker？
+
+访问 `https://[worker-name].workers.dev` 或在 Cloudflare Dashboard 查看。
+
+### Q: KV 数据会丢失吗？
+
+不会。KV 存储中的数据持久化存储，除非手动删除。
+
+### Q: 如何监控 Worker 执行？
+
+在 Cloudflare Dashboard → Workers → 你的 Worker → Real-time logs
+
+### Q: 请求限制是多少？
+
+- 免费版：100,000 请求/天
+- 付费版：无限制
+
+详见 [Cloudflare Workers 定价](https://workers.cloudflare.com/)
+
+---
+
+## 自定义域名
+
+如需使用自己的域名，而不是 `*.workers.dev`：
+
+1. Dashboard → Workers → 你的 Worker → Settings
+2. Routes → Add route
+3. 填入路由（如 `short.yourdomain.com/*`）
+4. 选择 Zone（你的域名）
+
+---
 
 ## 故障排除
 
 | 问题 | 解决方案 |
 |------|--------|
-| 404 错误 | 检查 KV 命名空间是否正确绑定，命名空间 ID 是否正确 |
-| 无法创建短链接 | 确认 KV 命名空间有读写权限，检查请求格式 |
-| 重定向失败 | 检查原始 URL 是否有效，查看浏览器控制台错误 |
-| CORS 错误 | CORS 已配置允许所有来源，若仍有问题检查浏览器安全策略 |
+| 部署失败 | 检查 wrangler.toml 配置，确保 KV namespace ID 正确 |
+| API 返回 404 | 检查请求路径是否正确（`/api/...`） |
+| KV 操作失败 | 确认 KV namespace 已创建并在 wrangler.toml 中配置 |
+| 超时错误 | KV 读写可能较慢，检查网络连接 |
 
-## 更新部署
-
-每次代码变更后：
-
-### 如果使用 Git 方式部署：
-只需推送到连接的仓库，Pages 会自动构建部署
-
-```bash
-git add .
-git commit -m "update short-url service"
-git push origin main
-```
-
-### 如果使用 Wrangler 部署：
-```bash
-wrangler pages deploy public
-```
+---
 
 ## 更多信息
 
-- [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/)
-- [KV 文档](https://developers.cloudflare.com/workers/runtime-apis/kv/)
+- [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)
 - [Wrangler CLI 文档](https://developers.cloudflare.com/workers/wrangler/)
+- [KV 存储文档](https://developers.cloudflare.com/workers/runtime-apis/kv/)
