@@ -57,7 +57,7 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({
       success: true,
       shortCode,
-      shortUrl: `https://${domain}/${shortCode}`,
+      shortUrl: `${new URL(request.url).origin}/${shortCode}`,
       originalUrl: url,
     }), {
       status: 201,

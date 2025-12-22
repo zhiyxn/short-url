@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "基于 Cloudflare Pages 的短链接服务",
   "scripts": {
-    "dev": "wrangler pages dev public --compatibility-date=2024-01-01 --kv URL_STORE",
+    "dev": "wrangler pages dev public --compatibility-date=2024-01-01",
     "deploy": "wrangler pages deploy public",
     "dev:worker": "wrangler dev",
     "deploy:worker": "wrangler deploy"

@@ -1,19 +1,19 @@
-# Cloudflare Workers 配置（如果使用 Workers 部署）
 name = "short-url"
-main = "src/index.js"
+type = "javascript"
+account_id = ""  # 部署时从 CF Dashboard 获取
+pages_build_output_dir = "public"
 compatibility_date = "2024-01-01"
 
-# KV 命名空间用于存储短链接映射
+# Cloudflare Pages KV 命名空间绑定
 [[kv_namespaces]]
 binding = "URL_STORE"
-id = "your_kv_namespace_id"
-preview_id = "your_preview_kv_namespace_id"
+id = ""  # 替换为实际的 KV namespace ID
+preview_id = ""  # 替换为预览环境的 KV namespace ID
 
-# 环境变量配置
-[vars]
-DOMAIN = "your-domain.com"
+# 环境变量
+[env.production]
+vars = { ENVIRONMENT = "production" }
 
-# Cloudflare Pages 配置（如果使用 Pages 部署）
-# Pages 项目需要在 Cloudflare Dashboard 中配置 KV 绑定
-# 或使用命令: wrangler pages deployment create --kv URL_STORE=<namespace_id>
-
+[[env.production.kv_namespaces]]
+binding = "URL_STORE"
+id = ""  # 替换为生产环境的 KV namespace ID
