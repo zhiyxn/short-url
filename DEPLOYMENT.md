@@ -35,10 +35,10 @@ preview_id = "your_preview_namespace_id"  # 预览环境 ID（可选）
 2. 在 Cloudflare Dashboard 创建新的 Pages 项目
 3. 选择 "连接 Git"
 4. 授权并选择此仓库
-5. **构建设置**（重要）：
-   - 框架：`无`
-   - 构建命令：（留空）
-   - 构建输出目录：`public`
+5. **构建设置**（重要，三个字段都要对）：
+   - Framework preset: `None`（选"无"）
+   - Build command: 留空（不要填任何东西）
+   - Build output directory: `public`（不是 `/public` 或 `./public`）
 6. **环境变量配置**（在 Pages 项目设置中）：
    - 进入项目 → 设置 → 函数
    - 添加 KV 命名空间绑定：

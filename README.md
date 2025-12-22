@@ -52,10 +52,10 @@ npm run dev
 2. 在 Cloudflare Dashboard 中创建 Pages 项目
 3. 选择 "连接 Git"
 4. 授权并选择此仓库
-5. **构建设置（重要）**：
-   - 框架：`无`
-   - 构建命令：（留空）
-   - 构建输出目录：`public`
+5. **构建设置（重要，三个字段都要对）**：
+   - Framework preset: `None`（选"无"）
+   - Build command: 留空（不要填任何东西）
+   - Build output directory: `public`（不是 `/public`）
 6. 部署后，在 Pages 项目设置中添加 KV 绑定：
    - 进入 → 设置 → Functions → KV namespace bindings
    - 变量名：`URL_STORE`

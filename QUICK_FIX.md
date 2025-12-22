@@ -16,15 +16,24 @@
 在 **Settings** 页面，找到 **Build settings** 部分：
 
 ```
-Build command:        （留空 - 不要填写任何内容）
-Build output directory: public
-Framework preset:      None
+Build command:              （留空或不填）
+Build output directory:     public
+Framework preset:           None
 ```
 
-**重要检查项：**
-- ✅ Build output directory = `public`（必须）
-- ✅ Build command = 空（留空）
-- ✅ Framework preset = `None`
+**关键说明：**
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| **Build command** | **留空** | 此项目不需要构建命令。如果系统要求必填，尝试填 `echo "No build needed"` |
+| **Build output directory** | **public** | 相对路径，指向仓库中的 `public` 文件夹，**不要**写成 `/public` 或 `./public` |
+| **Framework preset** | **None** | 选择"无"或"无框架" |
+
+**常见错误：**
+- ❌ Build output directory 填 `/public` → 错误，改为 `public`
+- ❌ Build output directory 填 `./public` → 可能报错，改为 `public`  
+- ❌ Build command 填 `npm run build` → 可能失败（项目没有 build 脚本），留空即可
+- ❌ 选择了具体框架（React/Vue/Next.js）→ 改为 `None`
 
 ### 步骤 3：重新部署
 
