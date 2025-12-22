@@ -1,0 +1,19 @@
+# Cloudflare Workers 配置（如果使用 Workers 部署）
+name = "short-url"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# KV 命名空间用于存储短链接映射
+[[kv_namespaces]]
+binding = "URL_STORE"
+id = "your_kv_namespace_id"
+preview_id = "your_preview_kv_namespace_id"
+
+# 环境变量配置
+[vars]
+DOMAIN = "your-domain.com"
+
+# Cloudflare Pages 配置（如果使用 Pages 部署）
+# Pages 项目需要在 Cloudflare Dashboard 中配置 KV 绑定
+# 或使用命令: wrangler pages deployment create --kv URL_STORE=<namespace_id>
+

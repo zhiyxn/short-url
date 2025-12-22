@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>短链接服务</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 32px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .result {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .result.show {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .result-title {
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
+    .short-url {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .short-url input {
+      flex: 1;
+      background: white;
+    }
+
+    .copy-btn {
+      padding: 12px 24px;
+      width: auto;
+      background: #667eea;
+      font-size: 14px;
+    }
+
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .error.show {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .stats {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔗 短链接服务</h1>
+    <p class="subtitle">快速生成简短易记的链接</p>
+
+    <form id="shortenForm">
+      <div class="form-group">
+        <label for="url">原始链接 *</label>
+        <input
+          type="url"
+          id="url"
+          placeholder="https://example.com/very/long/url"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="customCode">自定义短码（可选）</label>
+        <input
+          type="text"
+          id="customCode"
+          placeholder="mycode"
+          pattern="[a-zA-Z0-9]+"
+        >
+        <div class="hint">留空则自动生成，仅支持字母和数字</div>
+      </div>
+
+      <button type="submit" id="submitBtn">生成短链接</button>
+    </form>
+
+    <div class="error" id="error"></div>
+
+    <div class="result" id="result">
+      <div class="result-title">✅ 短链接已生成</div>
+      <div class="short-url">
+        <input type="text" id="shortUrl" readonly>
+        <button class="copy-btn" onclick="copyUrl()">复制</button>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('shortenForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultDiv = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
+    const shortUrlInput = document.getElementById('shortUrl');
+    const statsDiv = document.getElementById('stats');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const url = document.getElementById('url').value.trim();
+      const customCode = document.getElementById('customCode').value.trim();
+
+      if (!url) {
+        showError('请输入有效的 URL');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '生成中...';
+      hideError();
+      hideResult();
+
+      try {
+        const response = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url, customCode: customCode || undefined }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || '生成失败');
+        }
+
+        shortUrlInput.value = data.shortUrl;
+        statsDiv.innerHTML = `
+          <div>短码: <strong>${data.shortCode}</strong></div>
+          <div>原始链接: ${data.originalUrl}</div>
+        `;
+        showResult();
+
+        // 清空表单
+        form.reset();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '生成短链接';
+      }
+    });
+
+    function copyUrl() {
+      shortUrlInput.select();
+      document.execCommand('copy');
+
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.textContent = '已复制!';
+      setTimeout(() => {
+        btn.textContent = originalText;
+      }, 2000);
+    }
+
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add('show');
+    }
+
+    function hideError() {
+      errorDiv.classList.remove('show');
+    }
+
+    function showResult() {
+      resultDiv.classList.add('show');
+    }
+
+    function hideResult() {
+      resultDiv.classList.remove('show');
+    }
+  </script>
+</body>
+</html>
