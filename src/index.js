@@ -34,7 +34,7 @@ function corsHeaders() {
 // 创建短链接
 async function createShortUrl(request, env) {
   try {
-    const { url, customCode } = await request.json();
+    const { url, customCode, username } = await request.json();
 
     if (!url || !isValidUrl(url)) {
       return new Response(JSON.stringify({ error: '无效的 URL' }), {
@@ -76,6 +76,7 @@ async function createShortUrl(request, env) {
     const data = {
       url,
       shortCode,
+      username: username || '',
       createdAt: new Date().toISOString(),
       clicks: 0,
     };
@@ -87,6 +88,7 @@ async function createShortUrl(request, env) {
       shortCode,
       shortUrl: `https://${env.DOMAIN || 'your-domain.com'}/${shortCode}`,
       originalUrl: url,
+      username: username || '',
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json', ...corsHeaders() },
@@ -116,23 +118,6 @@ async function redirectToUrl(shortCode, env) {
   return Response.redirect(urlData.url, 302);
 }
 
-// 获取短链接信息
-async function getUrlInfo(shortCode, env) {
-  const data = await env.URL_STORE.get(shortCode);
-
-  if (!data) {
-    return new Response(JSON.stringify({ error: '短链接不存在' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-    });
-  }
-
-  return new Response(data, {
-    status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-  });
-}
-
 // 删除短链接
 async function deleteUrl(shortCode, env) {
   const data = await env.URL_STORE.get(shortCode);
@@ -150,6 +135,96 @@ async function deleteUrl(shortCode, env) {
     status: 200,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() },
   });
+}
+
+// 获取短链接列表
+async function listUrls(request, env) {
+  const requestUrl = new URL(request.url);
+  const limitParam = requestUrl.searchParams.get('limit');
+  const cursor = requestUrl.searchParams.get('cursor') || undefined;
+  let limit = Number.parseInt(limitParam || '100', 10);
+
+  if (Number.isNaN(limit) || limit <= 0) {
+    limit = 100;
+  }
+
+  if (limit > 1000) {
+    limit = 1000;
+  }
+
+  const listResult = await env.URL_STORE.list({ limit, cursor });
+  const items = await Promise.all(listResult.keys.map(async (key) => {
+    const value = await env.URL_STORE.get(key.name);
+    if (!value) return null;
+    try {
+      const data = JSON.parse(value);
+      return {
+        url: data.url,
+        shortCode: data.shortCode || key.name,
+        createdAt: data.createdAt,
+        clicks: data.clicks || 0,
+        username: data.username || '',
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  return new Response(JSON.stringify({
+    items: items.filter(Boolean),
+    cursor: listResult.cursor || null,
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+  });
+}
+
+// 批量删除短链接
+async function deleteUrlsBatch(request, env) {
+  try {
+    const { shortCodes } = await request.json();
+
+    if (!Array.isArray(shortCodes) || shortCodes.length === 0) {
+      return new Response(JSON.stringify({ error: 'shortCodes 不能为空' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      });
+    }
+
+    const trimmedCodes = shortCodes.map((code) => (typeof code === 'string' ? code.trim() : ''))
+      .filter((code) => code);
+
+    if (trimmedCodes.length === 0) {
+      return new Response(JSON.stringify({ error: 'shortCodes 不能为空' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      });
+    }
+
+    const results = await Promise.all(trimmedCodes.map(async (code) => {
+      const data = await env.URL_STORE.get(code);
+      if (!data) return { code, deleted: false };
+      await env.URL_STORE.delete(code);
+      return { code, deleted: true };
+    }));
+
+    const deleted = results.filter((item) => item.deleted).map((item) => item.code);
+    const notFound = results.filter((item) => !item.deleted).map((item) => item.code);
+
+    return new Response(JSON.stringify({
+      success: true,
+      deleted,
+      notFound,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: '请求处理失败' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    });
+  }
 }
 
 // 主处理函数
@@ -172,10 +247,14 @@ export default {
         return createShortUrl(request, env);
       }
 
-      // 获取短链接信息
-      if (path.startsWith('/api/info/') && request.method === 'GET') {
-        const shortCode = path.split('/api/info/')[1];
-        return getUrlInfo(shortCode, env);
+      // 获取短链接列表
+      if (path === '/api/list' && request.method === 'GET') {
+        return listUrls(request, env);
+      }
+
+      // 批量删除短链接
+      if (path === '/api/batch-delete' && request.method === 'POST') {
+        return deleteUrlsBatch(request, env);
       }
 
       // 删除短链接
@@ -212,18 +291,22 @@ export default {
             <pre>POST /api/shorten
 Content-Type: application/json
 
-{
+            {
   "url": "https://example.com/very/long/url",
-  "customCode": "mycode" // 可选，自定义短码
+  "customCode": "mycode", // 可选，自定义短码
+  "username": "alice" // 可选，创建者
 }</pre>
 
             <h3>2. 访问短链接</h3>
             <pre>GET /{shortCode}</pre>
 
-            <h3>3. 获取短链接信息</h3>
-            <pre>GET /api/info/{shortCode}</pre>
+            <h3>3. 获取短链接列表</h3>
+            <pre>GET /api/list</pre>
 
-            <h3>4. 删除短链接</h3>
+            <h3>4. 批量删除短链接</h3>
+            <pre>POST /api/batch-delete</pre>
+
+            <h3>5. 删除短链接</h3>
             <pre>DELETE /api/{shortCode}</pre>
           </body>
         </html>

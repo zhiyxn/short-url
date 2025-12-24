@@ -7,8 +7,9 @@
 - ✅ 生成短链接（随机或自定义短码）
 - ✅ 短链接重定向
 - ✅ 点击次数统计
-- ✅ 查询短链接信息
+- ✅ 获取短链接列表
 - ✅ 删除短链接
+- ✅ 批量删除短链接
 - ✅ CORS 支持
 - ✅ 高可用性（全球边缘节点）
 
@@ -56,7 +57,8 @@ npm run deploy
 ```json
 {
   "url": "https://example.com/very/long/url",
-  "customCode": "mycode"
+  "customCode": "mycode",
+  "username": "alice"
 }
 ```
 
@@ -66,7 +68,8 @@ npm run deploy
   "success": true,
   "shortCode": "mycode",
   "shortUrl": "https://your-worker.workers.dev/mycode",
-  "originalUrl": "https://example.com/very/long/url"
+  "originalUrl": "https://example.com/very/long/url",
+  "username": "alice"
 }
 ```
 
@@ -83,15 +86,41 @@ https://your-worker.workers.dev/mycode
 
 ---
 
-### GET `/api/info/{shortCode}` - 获取信息
+### GET `/api/list` - 获取短链接列表
 
 **响应** (200):
 ```json
 {
-  "url": "https://example.com/very/long/url",
-  "shortCode": "mycode",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "clicks": 42
+  "items": [
+    {
+      "url": "https://example.com/very/long/url",
+      "shortCode": "mycode",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "clicks": 42,
+      "username": "alice"
+    }
+  ],
+  "cursor": null
+}
+```
+
+---
+
+### POST `/api/batch-delete` - 批量删除短链接
+
+**请求**：
+```json
+{
+  "shortCodes": ["mycode", "other"]
+}
+```
+
+**响应** (200):
+```json
+{
+  "success": true,
+  "deleted": ["mycode"],
+  "notFound": ["other"]
 }
 ```
 
