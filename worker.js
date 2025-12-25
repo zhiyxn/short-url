@@ -23,11 +23,26 @@ function isValidUrl(url) {
 }
 
 // 处理 CORS
-function corsHeaders() {
+function parseAllowedOrigins(env) {
+  const raw = (env.ALLOWED_ORIGINS || '').trim();
+  if (!raw) return null;
+  const items = raw.split(',').map((item) => item.trim()).filter(Boolean);
+  if (items.includes('*')) return null;
+  return items.length > 0 ? items : null;
+}
+
+function corsHeaders(request, env) {
+  const origin = request.headers.get('Origin');
+  const allowedOrigins = parseAllowedOrigins(env);
+  const allowOrigin = allowedOrigins
+    ? (origin && allowedOrigins.includes(origin) ? origin : 'null')
+    : '*';
+
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    ...(allowedOrigins ? { Vary: 'Origin' } : {}),
   };
 }
 
@@ -39,7 +54,7 @@ async function createShortUrl(request, env) {
     if (!url || !isValidUrl(url)) {
       return new Response(JSON.stringify({ error: '无效的 URL' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
       });
     }
 
@@ -51,7 +66,7 @@ async function createShortUrl(request, env) {
       if (existing) {
         return new Response(JSON.stringify({ error: '该短码已被使用' }), {
           status: 409,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
         });
       }
     } else {
@@ -67,7 +82,7 @@ async function createShortUrl(request, env) {
       if (attempts >= 10) {
         return new Response(JSON.stringify({ error: '生成短码失败，请重试' }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
         });
       }
     }
@@ -91,12 +106,12 @@ async function createShortUrl(request, env) {
       username: username || '',
     }), {
       status: 201,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: '请求处理失败' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
     });
   }
 }
@@ -119,13 +134,13 @@ async function redirectToUrl(shortCode, env) {
 }
 
 // 删除短链接
-async function deleteUrl(shortCode, env) {
+async function deleteUrl(request, shortCode, env) {
   const data = await env.URL_STORE.get(shortCode);
 
   if (!data) {
     return new Response(JSON.stringify({ error: '短链接不存在' }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
     });
   }
 
@@ -133,7 +148,7 @@ async function deleteUrl(shortCode, env) {
 
   return new Response(JSON.stringify({ success: true, message: '短链接已删除' }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
   });
 }
 
@@ -175,7 +190,7 @@ async function listUrls(request, env) {
     cursor: listResult.cursor || null,
   }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
   });
 }
 
@@ -187,7 +202,7 @@ async function deleteUrlsBatch(request, env) {
     if (!Array.isArray(shortCodes) || shortCodes.length === 0) {
       return new Response(JSON.stringify({ error: 'shortCodes 不能为空' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
       });
     }
 
@@ -197,7 +212,7 @@ async function deleteUrlsBatch(request, env) {
     if (trimmedCodes.length === 0) {
       return new Response(JSON.stringify({ error: 'shortCodes 不能为空' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
       });
     }
 
@@ -217,12 +232,12 @@ async function deleteUrlsBatch(request, env) {
       notFound,
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: '请求处理失败' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
     });
   }
 }
@@ -236,7 +251,7 @@ export default {
     // 处理 CORS 预检请求
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: corsHeaders(),
+        headers: corsHeaders(request, env),
       });
     }
 
@@ -260,12 +275,12 @@ export default {
       // 删除短链接
       if (path.startsWith('/api/') && request.method === 'DELETE') {
         const shortCode = path.split('/api/')[1];
-        return deleteUrl(shortCode, env);
+        return deleteUrl(request, shortCode, env);
       }
 
       return new Response(JSON.stringify({ error: 'API 路由不存在' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(request, env) },
       });
     }
 
